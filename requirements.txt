@@ -1,1 +1,3 @@
-documenteer[technote]
+tox
+pre-commit
+documenteer[technote]==0.8.0b1
