@@ -41,6 +41,8 @@ Possible ways to share models between server and clients
 While working on this problem of model and code duplication between servers and clients, we examined multiple approaches.
 This section outlines those, and these were discarded, before proposing the *vertical monorepo* architecture that we propose.
 
+.. _client-package-repo:
+
 A client package repository for every application repository
 ------------------------------------------------------------
 
@@ -93,6 +95,46 @@ The FastAPI application itself imports the library locally, while external clien
 This solution seems to solve the problem of both making Pydantic interface models efficiently reusable, while eliminating repository sprawl and making it possible to encapsulate feature update to a single pull request.
 On the other hand, this solution us to change how we structure GitHub repositories, effectively combining the existing FastAPI application template and the PyPI package template into one.
 The next section explores the mechanics of a vertical monorepo.
+
+The mechanics of a vertical monorepo
+====================================
+
+SQuaRE conventionally structures both its application and library repositories such that a single Python package (as defined by a ``pyproject.toml`` file) is developed from the root of an individual Git repository.
+Although it's appealing to think that both the FastAPI application and the client library could be developed and released from the same Python package, Python applications and libraries are distinct in a number of ways, starting with how their dependencies are managed (see the discussion in :ref:`client-package-repo`).
+This necessites that a vertical monorepo must have two directories at its root to host separate Python projects for the client and server:
+
+.. code-block:: text
+   :caption: Vertical client-server monorepo layout (abridged)
+
+   example
+   ├── .github
+   │   ├── dependabot.yml
+   │   └── workflows
+   ├── .pre-commit-config.yaml
+   ├── client
+   │   ├── pyproject.toml
+   │   └── src
+   │       ├── exampleclient
+   │       │   ├── __init__.py
+   │       │   └── models.py
+   │       └── tests
+   └── server
+       ├── Dockerfile
+       ├── pyproject.toml
+       ├── requirements
+       └── src
+           ├── example
+           │   ├── __init__.py
+           │   ├── config.py
+           │   ├── dependencies
+           │   ├── domain
+           │   ├── main.py
+           │   ├── handlers
+           │   └── services
+           └── tests
+
+This monorepo contains two Python packages: ``example`` (the application) and ``exampleclient`` (the library).
+The ``exampleclient.models`` module contains the Pydantic classes that define the REST API for the ``example`` application.
 
 .. Make in-text citations with: :cite:`bibkey`.
 
