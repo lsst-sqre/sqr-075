@@ -136,6 +136,38 @@ This necessites that a vertical monorepo must have two directories at its root t
 This monorepo contains two Python packages: ``example`` (the application) and ``exampleclient`` (the library).
 The ``exampleclient.models`` module contains the Pydantic classes that define the REST API for the ``example`` application.
 
+How the application depends on the client library
+-------------------------------------------------
+
+For an effective development workflow, the application needs to be able to import models from the client library locally, rather than through a PyPI release.
+Applications use the ``requirements.txt`` file format to declare their dependencies.
+Local dependencies can be declared with a relative path:
+
+.. code-block::
+   :caption: example/requirements/main.in
+   
+   example-client @ file://../../exampleclient
+
+References:
+
+- `requirements.txt format <https://pip.pypa.io/en/stable/reference/requirements-file-format/?highlight=requirements.txt#requirements-file-format>`__
+- `VCS support with a file protocol <https://pip.pypa.io/en/stable/topics/vcs-support/#vcs-support>`__
+
+.. note::
+   
+   To date, SQuaRE uses setuptools as the build backend for its projects.
+   Applications additionally use pip and pip-tools to compile pinned dependencies in a ``requirements.txt`` format from abstract dependencies.
+   Is there an obviously better build backend that we should use in our client-server monorepos?
+   
+   TK:
+   
+   - Poetry does many of the same things that we we're already doing with compiled dependencies and tox for environment. Poetry doesn't seem to be specifically made for Poetry though.
+   - Pants is a build infrastructure for Python monorepos (with growing capabilities for other language). Its not clear that the vertical monorepos proposed here are *enough* of a mono repo to warrant Pants (or warrant our investment in changing to it now).
+     Pants raison d'etre is to support caching in tests and builds in _real_ monorepos.
+     By comparison, the vertical monorepos described here are a minor step-up from the standard multi-repo setup that standard Python tooling caters to.
+     For more information, see this Pants talk: https://youtu.be/1qurVKSYVqY
+
+
 .. Make in-text citations with: :cite:`bibkey`.
 
 .. References
