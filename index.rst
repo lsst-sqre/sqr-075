@@ -48,10 +48,10 @@ Client model repositories
 
 Fundamentally, Python code is shared through *library* packages that are installable from repositories like PyPI and importable into other libraries or Python applications.
 Note that applications (such as SQuaRE's FastAPI web applications) are *not* libraries.
-Even if they were published to a repository like PyPI, applications have pinned dependencies for reasons of build reproducibilty that prevent them from realistically being installed in other contexts.
+Even if they were published to a repository like PyPI, applications have pinned dependencies for reasons of build reproducibility that prevent them from realistically being installed in other contexts.
 This is also why SQuaRE has two fundamentally different templates for python projects: the FastAPI application template and the Python library template.
 
-Keeping with the common SQuaRE practice of using separate Git repositories for Python library packages from applications, we found three concievable patterns:
+Keeping with the common SQuaRE practice of using separate Git repositories for Python library packages from applications, we found three conceivable patterns:
 
 1. A client package repository for every application repository
 2. Using Safir_ as a shared library for application models
@@ -62,13 +62,13 @@ Options 2 and 3 collect models together, which reduces the number of repositorie
 
 In all of these cases, using a separate library for application models makes application development much more inconvenient.
 This is because server application dependencies are resolved and hashed with pip-tools_.
-This practice results in highly reproducible Docker image builds, and of course implies that a server application's depenencies are stable.
+This practice results in highly reproducible Docker image builds, and of course implies that a server application's dependencies are stable.
 There isn't a good workflow for developing a library simultaneously with an application.
 
 A vertical monorepo architecture
 --------------------------------
 
-The potential solutions listed previously introduce the issue of coordianted pull requests and releases being required to make any change to any REST API change.
+The potential solutions listed previously introduce the issue of coordinated pull requests and releases being required to make any change to any REST API change.
 This indicates that separate client library repositories are not the right approach.
 
 The orthogonal approach, then, is to consider a vertical mono repo architecture within the domain of each web API.
@@ -86,7 +86,7 @@ The mechanics of a vertical monorepo
 
 SQuaRE conventionally structures both its application and library repositories such that a single Python package (as defined by a ``pyproject.toml`` file) is developed from the root of an individual Git repository.
 Although it's appealing to think that both the FastAPI application and the client library could be developed and released from the same Python package, Python applications and libraries are distinct in a number of ways, starting with how their dependencies are managed (see the discussion in :ref:`separate-client-repo` about pip-tools_).
-This necessites that a vertical monorepo must have two directories at its root to host separate Python projects for the client and server:
+This necessitates that a vertical monorepo must have two directories at its root to host separate Python projects for the client and server:
 
 .. code-block:: text
    :caption: Vertical client-server monorepo layout (abridged)
@@ -132,10 +132,10 @@ We found the only viable mechanism is to manually pip install the client library
 The downside of this approach is that the client isn't considered by the pinned dependencies compiled by pip-tools_.
 Normally runtime dependencies for the server application are abstractly listed in a ``requirements/main.in`` file for each application; pip-tools_ compiles these dependencies and their sub-dependencies into a ``requirements/main.txt`` file which is committed to the Git repository and actually used for installing dependencies.
 This practice ensures that Docker builds and development environments alike are reproducible.
-In practice, the client library's absense from ``requirements/main.txt`` itself isn't harmful because the client is inherently pinned by virtue of being co-developed in the same Git repository.
+In practice, the client library's absence from ``requirements/main.txt`` itself isn't harmful because the client is inherently pinned by virtue of being co-developed in the same Git repository.
 
-What's potentially concerning, though, is the absense of the client's own dependencies from the application's ``requirements/main.txt`` dependencies.
-We could mitigate this risk by limiting client library depenencies to packages that are already in the main application's ``requirements/main.txt``.
+What's potentially concerning, though, is the absence of the client's own dependencies from the application's ``requirements/main.txt`` dependencies.
+We could mitigate this risk by limiting client library dependencies to packages that are already in the main application's ``requirements/main.txt``.
 
 Installing the client in the Docker image
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -206,6 +206,63 @@ This is a project Makefile that prepares both types of requirements files with p
    	cd server && tox run -e=run
 
 Again, the Docker build uses the ``main.hashed.txt`` requirements, while the Tox environment uses the unhashed ``main.txt`` and ``dev.txt`` files.
+
+Testing in the vertical monorepo
+--------------------------------
+
+We recommend that tests are only created for the server application, and that those tests are hosted out of the ``server/tests`` directory.
+
+On a practical basis, we found that we could not create a single ``tests/`` directory in the project root that could be run from a single Tox_ configuration file in the project root.
+Instead, the ``tox.ini`` configuration files needed to be located in the same directories as the ``pyproject.toml`` project files.
+This naturally implies ``test/`` directories that are also in the ``server/`` and ``client/`` directories.
+
+Only Python unit tests are needed in the ``server/tests`` directory, though, because the client and its models can be used in the server endpoint tests.
+Add extra tests for the client library is superfluous.
+
+Linting the client and server code bases
+----------------------------------------
+
+For Python projects, we use linters to ensure consistency and correctness:
+
+- isort, to sort imports consistently
+- block, to format Python code consistently
+- mypy, to check type annotations
+- flake8, to statically validate Python code
+
+These linters are generally triggered by automatically with the pre-commit Git hook manager, or manually through a tox environment.
+
+In the monorepo, pre-commit itself needs to be configured at the root since it doesn't have specific support for monorepos (see `pre-commit/pre-commit#466 <https://github.com/pre-commit/pre-commit/issues/466>`__).
+Thus the monorepo has a ``.pre-commit-config.yaml`` file at its root.
+If the pre-commit hooks need to be configured different for each repo, though
+It's possible to configure the pre-commit hooks differently for the client and server using file path filters in the pre-commit configuration (as described in the mentioned GitHub issue), but in practice this shouldn't be necessary.
+
+Since flake8 is configured with a ``.flake8`` file, that file can be located at the root of the repository.
+SQuaRE's flake8 configuration is uniform across all projects.
+
+Mypy, black, and isort are configured in pyproject.toml files.
+In those cases, the configurations are done separately in ``server/pyproject.toml`` and ``client/pyproject.toml`` files.
+
+Docker build
+------------
+
+In the monorepo it's best to place the server application's Dockerfile at the root of the Git repository, rather than in the ``server`` subdirectory.
+When the Dockerfile it located at the root, both the server and client directories can be copied and pip-installed into an intermediate stage of the Docker build.
+
+Documentation
+-------------
+
+In most cases, a single documentation project for both the client and server is appropriate.
+Since both the client and server APIs are available in the documentation build time, code from both the server and client can be documented in the same Sphinx project by referencing the correct modules with the ``automodapi`` directive.
+Because of how the ``tox.ini`` files need to be co-located alongside ``pyproject.toml`` files, the best place is likely in ``server/docs`` and built through a tox environment in the server.
+
+GitHub Actions
+--------------
+
+GitHub Actions workflows for the entire repository are collected in the ``.github/workflows`` directory.
+SQuaRE uses workflows to run tests, linters, and ultimately build and publish Docker images, PyPI packages, and documentation sites.
+It's conceivable to treat the client and server completely separately with individual ``.github/workflows/server-ci.yaml`` and ``.github/workflows/client-ci.yaml`` workflow files.
+In practice, though, there can actually be a benefit from running the CI/CD workflows on both the client and server in the *same* workflow, but with separate GitHub Actions jobs.
+If the test jobs for either the client or server fail, then both of the publishing steps for the client and server can be cancelled.
 
 
 .. Make in-text citations with: :cite:`bibkey`.
