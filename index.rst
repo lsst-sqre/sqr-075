@@ -19,17 +19,17 @@ Traditionally, we have focused our efforts on optimizing the development process
 .. This technote came about from a recognition that there are valuable efficiency gains for ourselves and others if we take client development with the same care.
 
 One of our most significant advances in developing server applications in recent years has been in adopting FastAPI_, the application framework, and Pydantic_, the data modelling and validation library.
-FastAPI uses Pydantic models to describe the schemas for both requests and responses in a REST API.
-Pydantic integrates with Python annotations so that we can be confident that we are using API interface models correctly in a code base (e.g., validate that fields exist, or that the field can be set to null/None) using a static type checker like Mypy.
+FastAPI uses Pydantic models to describe the data schemas for both requests and responses in a REST API.
+Pydantic integrates with Python annotations so that we can be confident that we are using API interface models correctly in a code base (e.g., validate that fields exist, or that the field can be set to null/None) using a static type checker like Mypy_.
 Additionally, Pydantic performs validation of datasets to ensure that it conforms to the schema described by the type annotations and any additional validation functions.
 Finally, FastAPI automatically uses these Pydantic models to generate detailed REST API documentation with the OpenAPI standard.
 
-When we develop clients, we are of course using the same schemas for the complementary actions of sending requests and parsing responses.
+Clients are, of course, using the same schemas for the complementary actions of sending requests and parsing responses.
 And although it's not strictly necessary, client development benefits greatly from also using Pydantic classes to describe the request and response schemas for the same reasons of static type analysis and automatic data parsing and validation.
 
 In principle, the client and server *can* use the very same Pydantic classes to describe the request and response bodies in a REST API.
 To date, though, we have failed to establish an effective pattern for sharing these model classes.
-As a concrete example, both Mobu and Noteburst are clients for the JupyterLab Controller.
+As a concrete example, both Mobu_ and Noteburst_ are clients for the `JupyterLab Controller`_.
 In both Mobu and Noteburst we are independently reproducing the Pydantic models of the JupyterLab Controller, either by copying-and-pasting from the JupyterLab Controller application codebase, or by developing new Pydantic models classes based on the JupyterLab Controller schema in principle.
 
 Although this works, it is not efficient, due to the duplication of code (and more fundamentally, *information*) across multiple repositories.
@@ -39,52 +39,37 @@ Possible ways to share models between server and clients
 ========================================================
 
 While working on this problem of model and code duplication between servers and clients, we examined multiple approaches.
-This section outlines those, and these were discarded, before proposing the *vertical monorepo* architecture that we propose.
+This section outlines those, and these were discarded, before proposing the *vertical monorepo* architecture.
 
-.. _client-package-repo:
+.. _separate-client-repo:
 
-A client package repository for every application repository
-------------------------------------------------------------
+Client model repositories
+-------------------------
 
 Fundamentally, Python code is shared through *library* packages that are installable from repositories like PyPI and importable into other libraries or Python applications.
 Note that applications (such as SQuaRE's FastAPI web applications) are *not* libraries.
 Even if they were published to a repository like PyPI, applications have pinned dependencies for reasons of build reproducibilty that prevent them from realistically being installed in other contexts.
 This is also why SQuaRE has two fundamentally different templates for python projects: the FastAPI application template and the Python library template.
 
-A potential approach, though, is to create a client library repository for every server application repository.
-For example, if a server application is developed in a GitHub repository ``lsst-sqre/noteburst``, we would create a complementary GitHub repository ``lsst-sqre/noteburst-client``.
-That client repository would contain the Pydantic model classes that describe the application's REST API, for both requests and responses.
-It would be structured as a Python library package, and be available from PyPI.
-Then the server application and any clients alike could depend on that client package.
+Keeping with the common SQuaRE practice of using separate Git repositories for Python library packages from applications, we found three concievable patterns:
 
-The downside of this approach is a doubling of the number of GitHub repositories that need to be maintained.
-Although we have started to automated many aspects of Python project maintenance, there is still effort in migrating projects to newer build and testing infrastructures, creating documentation sites, and making releases.
+1. A client package repository for every application repository
+2. Using Safir_ as a shared library for application models
+3. A dedicated monorepo for application models
 
-The issue then, if finding an architecture that enables us to refactor the Pydantic models for our REST APIs into reusable library packages without unnecessarily expanding the number of Git repositories that need to be managed.
+The first option keeps libraries focused on a single domain, but has the downside of doubling the number of GitHub repositories that need to be maintained.
+Options 2 and 3 collect models together, which reduces the number of repositories, but introduces new issues of version management if different versions of an application's models need to be used simultaneously by a client.
 
-Safir as a source for server application models
------------------------------------------------
-
-Safir_ is SQuaRE's library of shared code for building FastAPI applications.
-Since every application already depends on Safir, we could refactor all the Pydantic models of applications down into Safir.
-The clients that are also SQuaRE applications would immediately be able to import the Pydantic model classes of other applications.
-A downside of this approach is that clients that are not FastAPI applications (like a JupyterLab widget or a CLI) would get many of the server-oriented dependencies of Safir, such as FastAPI itself.
-This could be solved by refactoring Safir and its Python dependencies slightly so it would be possible to install Safir without also installing FastAPI.
-
-A dedicated horizontal monorepo for SQuaRE API models
------------------------------------------------------
-
-If Safir is not the right Python package for sharing Pydantic models, an alternative solution is to create a dedicated monorepo for these classes that both FastAPI applications *and* Python clients can easily depend on.
-For example, a Python package named ``square-apis``.
-The problem with this horizontally-scaling monorepo — as with using Safir as the monorepo — is that updates to an application's REST API require at least two coordinated codebase changes, and likely three or more.
-First, the models must be updated in the shared models monorepo; second, the application itself must be updated to use these models, and finally any clients need to be updated to use the revised models.
+In all of these cases, using a separate library for application models makes application development much more inconvenient.
+This is because server application dependencies are resolved and hashed with pip-tools_.
+This practice results in highly reproducible Docker image builds, and of course implies that a server application's depenencies are stable.
+There isn't a good workflow for developing a library simultaneously with an application.
 
 A vertical monorepo architecture
 --------------------------------
 
-The previous two monorepo approaches scaled *horizontally* by collecting the Pydantic models for every SQuaRE FastAPI application into a single library.
-While those solutions solve the issue of doubling the number of GitHub repositories, they introduce a new issue of coordinated pull requests and releases being required to make any change to any REST API change.
-This indicates that a horizontal monorepo is not the right approach.
+The potential solutions listed previously introduce the issue of coordianted pull requests and releases being required to make any change to any REST API change.
+This indicates that separate client library repositories are not the right approach.
 
 The orthogonal approach, then, is to consider a vertical mono repo architecture within the domain of each web API.
 Put concretely: in the same GitHub repository where a FastAPI application is developed, a Python library containing the Pydantic models is also developed.
@@ -100,7 +85,7 @@ The mechanics of a vertical monorepo
 ====================================
 
 SQuaRE conventionally structures both its application and library repositories such that a single Python package (as defined by a ``pyproject.toml`` file) is developed from the root of an individual Git repository.
-Although it's appealing to think that both the FastAPI application and the client library could be developed and released from the same Python package, Python applications and libraries are distinct in a number of ways, starting with how their dependencies are managed (see the discussion in :ref:`client-package-repo`).
+Although it's appealing to think that both the FastAPI application and the client library could be developed and released from the same Python package, Python applications and libraries are distinct in a number of ways, starting with how their dependencies are managed (see the discussion in :ref:`separate-client-repo` about pip-tools_).
 This necessites that a vertical monorepo must have two directories at its root to host separate Python projects for the client and server:
 
 .. code-block:: text
@@ -177,5 +162,10 @@ References:
 ..    :style: lsst_aa
 
 .. _fastapi: https://fastapi.tiangolo.com
+.. _`JupyterLab Controller`: https://github.com/lsst-sqre/jupyterlab-controller
+.. _mobu: https://github.com/lsst-sqre/mobu
+.. _mypy: https://mypy.readthedocs.io/en/stable/
+.. _noteburst: https://github.com/lsst-sqre/noteburst
+.. _pip-tools: https://pip-tools.rtfd.io/
 .. _pydantic: https://docs.pydantic.dev
 .. _safir: https://safir.lsst.io
