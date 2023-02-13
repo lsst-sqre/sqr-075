@@ -99,12 +99,12 @@ This necessites that a vertical monorepo must have two directories at its root t
    ├── client
    │   ├── pyproject.toml
    │   └── src
-   │       ├── exampleclient
-   │       │   ├── __init__.py
-   │       │   └── models.py
-   │       └── tests
+   │       └── exampleclient
+   │           ├── __init__.py
+   │           └── models.py
+   ├── Dockerfile
+   ├── Makefile
    └── server
-       ├── Dockerfile
        ├── pyproject.toml
        ├── requirements
        └── src
@@ -125,32 +125,87 @@ How the application depends on the client library
 -------------------------------------------------
 
 For an effective development workflow, the application needs to be able to import models from the client library locally, rather than through a PyPI release.
-Applications use the ``requirements.txt`` file format to declare their dependencies.
-Local dependencies can be declared with a relative path:
+In current practice, applications use the ``requirements.txt`` file format to declare their dependencies.
+We were not able to declare a local dependency in the requirements file.
 
-.. code-block::
-   :caption: example/requirements/main.in
-   
-   example-client @ file://../../exampleclient
+We found the only viable mechanism is to manually pip install the client library in development and deployment contexts (the specific patterns are explored below).
+The downside of this approach is that the client isn't considered by the pinned dependencies compiled by pip-tools_.
+Normally runtime dependencies for the server application are abstractly listed in a ``requirements/main.in`` file for each application; pip-tools_ compiles these dependencies and their sub-dependencies into a ``requirements/main.txt`` file which is committed to the Git repository and actually used for installing dependencies.
+This practice ensures that Docker builds and development environments alike are reproducible.
+In practice, the client library's absense from ``requirements/main.txt`` itself isn't harmful because the client is inherently pinned by virtue of being co-developed in the same Git repository.
 
-References:
+What's potentially concerning, though, is the absense of the client's own dependencies from the application's ``requirements/main.txt`` dependencies.
+We could mitigate this risk by limiting client library depenencies to packages that are already in the main application's ``requirements/main.txt``.
 
-- `requirements.txt format <https://pip.pypa.io/en/stable/reference/requirements-file-format/?highlight=requirements.txt#requirements-file-format>`__
-- `VCS support with a file protocol <https://pip.pypa.io/en/stable/topics/vcs-support/#vcs-support>`__
+Installing the client in the Docker image
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. note::
+In the Docker image, both the client and server directories are copied into the intermediate ``install-image`` stage of the Docker build and installed into the virtual environment:
+
+.. code-block:: Dockerfile
+
+   RUN pip install --no-cache-dir ./client
+   RUN pip install --no-cache-dir ./server
+
+Installing the client in the server's Tox environments
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Tox_ runs tests and other development tasks in virtual environments that Tox itself manages.
+To date, the application dependencies are installed using ``pip install -r ...``-type commands through the Tox ``deps`` environment configuration:
+
+.. code-block:: ini
+
+   [testenv]
+   deps =
+       -r{toxinidir}/requirements/main.txt
+       -r{toxinidir}/requirements/dev.txt
+
+As with the Dockerfile, the local pip installation of the client is accomplished by pointing to the client directory:
+
+.. code-block:: ini
+
+   [testenv]
+   deps =
+       -r{toxinidir}/requirements/main.txt
+       -r{toxinidir}/requirements/dev.txt
+       ../client
+
+We found this only works if the ``requirements/main.txt`` and ``dev.txt`` requirements are *unhashed*.
+Conventionally, we generate hashed requirements files with pip-tools_ as a security measure to ensure that the packages being installed in the deployment Docker image are *exactly* the same as those tested against.
+However, when Tox uses pip to install hashed requirements file, it triggers a mode where pip requires hashed dependencies for all entries in the Tox ``deps`` configuration.
+As the local client dependency is unhashed, the requirements files *cannot* be hashed.
+
+A work-around for this is to generate both hashed and unhashed requirements, and use the hashed requirements for Docker builds and the unhashed dependencies in Tox environments.
+This is a project Makefile that prepares both types of requirements files with pip-tools:
+
+.. code-block:: Makefile
+   :caption: Makefile
+
+   .PHONY: update-deps
+   update-deps:
+   	pip install --upgrade pip-tools pip setuptools
+   	pip-compile --upgrade --build-isolation --generate-hashes --output-file server/requirements/main.hashed.txt server/requirements/main.in
+   	pip-compile --upgrade --build-isolation --generate-hashes --output-file server/requirements/dev.hashed.txt server/requirements/dev.in
+   	pip-compile --upgrade --build-isolation --allow-unsafe --output-file server/requirements/main.txt server/requirements/main.in
+   	pip-compile --upgrade --build-isolation --allow-unsafe --output-file server/requirements/dev.txt server/requirements/dev.in
    
-   To date, SQuaRE uses setuptools as the build backend for its projects.
-   Applications additionally use pip and pip-tools to compile pinned dependencies in a ``requirements.txt`` format from abstract dependencies.
-   Is there an obviously better build backend that we should use in our client-server monorepos?
+   .PHONY: init
+   init:
+   	pip install --editable "./client[dev]"
+   	pip install --editable ./server
+   	pip install --upgrade -r server/requirements/main.txt -r server/requirements/dev.txt
+   	rm -rf ./server.tox
+   	pip install --upgrade pre-commit tox
+   	pre-commit install
    
-   TK:
+   .PHONY: update
+   update: update-deps init
    
-   - Poetry does many of the same things that we we're already doing with compiled dependencies and tox for environment. Poetry doesn't seem to be specifically made for Poetry though.
-   - Pants is a build infrastructure for Python monorepos (with growing capabilities for other language). Its not clear that the vertical monorepos proposed here are *enough* of a mono repo to warrant Pants (or warrant our investment in changing to it now).
-     Pants raison d'etre is to support caching in tests and builds in _real_ monorepos.
-     By comparison, the vertical monorepos described here are a minor step-up from the standard multi-repo setup that standard Python tooling caters to.
-     For more information, see this Pants talk: https://youtu.be/1qurVKSYVqY
+   .PHONY: run
+   run:
+   	cd server && tox run -e=run
+
+Again, the Docker build uses the ``main.hashed.txt`` requirements, while the Tox environment uses the unhashed ``main.txt`` and ``dev.txt`` files.
 
 
 .. Make in-text citations with: :cite:`bibkey`.
@@ -169,3 +224,4 @@ References:
 .. _pip-tools: https://pip-tools.rtfd.io/
 .. _pydantic: https://docs.pydantic.dev
 .. _safir: https://safir.lsst.io
+.. _tox: https://tox.wiki/en/latest/
