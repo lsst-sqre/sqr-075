@@ -89,6 +89,7 @@ Although it's appealing to think that both the FastAPI application and the clien
 This necessitates that a vertical monorepo must have two directories at its root to host separate Python projects for the client and server:
 
 .. code-block:: text
+   :name: layout
    :caption: Vertical client-server monorepo layout (abridged)
 
    example
@@ -264,6 +265,59 @@ It's conceivable to treat the client and server completely separately with indiv
 In practice, though, there can actually be a benefit from running the CI/CD workflows on both the client and server in the *same* workflow, but with separate GitHub Actions jobs.
 If the test jobs for either the client or server fail, then both of the publishing steps for the client and server can be cancelled.
 
+Naming the client
+=================
+
+The :ref:`repository layout example <layout>` suggests that the client package and Python namespace should be ``exampleclient`` if the server application is named ``example``.
+We may instead want to adopt a brand-centric approach to the client since it forms a public interface.
+
+Client package naming
+---------------------
+
+We may want to systematically prefix the package names for discovery and sorting on PyPI and Conda-Forge.
+For example, rather than ``noteburst-client``, we may prefer to use ``rsp-notebust-client`` or even ``rubin-rsp-noteburst-client``.
+This will reduce the risk of collisions with other packages on open source package registries.
+
+Python namespace
+----------------
+
+We may want place client libraries in a common namespace using a Python packaging feature called `namespace packages`_.
+For example, clients for RSP services may want to use the ``lsst.rsp`` namespace: ``lsst.rsp.noteburst``.
+
+Namespace packages can be set up by adding intermediate directories inside the ``src`` directory:
+
+.. code-block:: text
+   :name: namespaced-layout
+   :caption: Namespace client package example (``lsst.rsp.noteburst``)
+
+   example
+   ├── .github
+   ├── client
+   │   ├── pyproject.toml
+   │   └── src
+   │       └── lsst
+   │           └── rsp
+   │               └── example
+   │                   ├── __init__.py
+   │                   └── models.py
+   ├── Dockerfile
+   ├── Makefile
+   └── server
+       ├── pyproject.toml
+       └── src
+           └── example
+
+With a setuptools build backend, the namespace package for the client can be discovered with this configuration in ``pyproject.toml``:
+
+.. code-block:: toml
+
+   [tool.setuptools.packages.find]
+   where = ["src"] # for namespace package discovery
+
+.. note::
+
+   Client libraries for Roundtable applications may or may not use a similar namespace prefix, depending on our marketing strategy.
+   For example, LSST the Docs (or its successor) might not use "roundtable" in its branding if we want advertise it as being deployable separately from Phalanx/Roundtable.
 
 .. Make in-text citations with: :cite:`bibkey`.
 
@@ -277,6 +331,7 @@ If the test jobs for either the client or server fail, then both of the publishi
 .. _`JupyterLab Controller`: https://github.com/lsst-sqre/jupyterlab-controller
 .. _mobu: https://github.com/lsst-sqre/mobu
 .. _mypy: https://mypy.readthedocs.io/en/stable/
+.. _namespace packages: https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
 .. _noteburst: https://github.com/lsst-sqre/noteburst
 .. _pip-tools: https://pip-tools.rtfd.io/
 .. _pydantic: https://docs.pydantic.dev
