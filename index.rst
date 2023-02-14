@@ -319,6 +319,27 @@ With a setuptools build backend, the namespace package for the client can be dis
    Client libraries for Roundtable applications may or may not use a similar namespace prefix, depending on our marketing strategy.
    For example, LSST the Docs (or its successor) might not use "roundtable" in its branding if we want advertise it as being deployable separately from Phalanx/Roundtable.
 
+Architectural patterns for Pydantic models
+==========================================
+
+In many of our applications, our existing practice has been to reuse the same Pydantic models for both the REST API and the application's internal domain layer.
+This is a convenient, but has the downside of exposing the application's internal domain through the REST API.
+If the models are now shared with clients, the interface models truly must be separate because clients are unlikely to have access to the dependencies of the server's domain models.
+
+The client-server monorepo architecture suggests a four-layer model architecture:
+
+Interface models
+    These are stored in the client library, and strictly describe the API request and response schemas.
+Server-side interface models
+    These are stored in the server application alongside the API route handlers, and are subclasses of the interface models that include additional constructor class methods.
+Server-side domain models
+    These models (which could even be simple dataclasses) store the application's internal domain information and logic. The service layer acts on domain models, and the server-side interface response models take domain models as input in their constructors.
+Storage models
+    These models describe the data as it is stored in database like Postgres, Redis, or an external API.
+    Our SQL database models are typically SQLAlchemy classes, while the Redis and external API models are typically Pydantic models.
+    Using distinct storage models from the API and domain is already common SQuaRE practice.
+
+
 .. Make in-text citations with: :cite:`bibkey`.
 
 .. References
