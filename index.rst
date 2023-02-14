@@ -339,6 +339,36 @@ Storage models
     Our SQL database models are typically SQLAlchemy classes, while the Redis and external API models are typically Pydantic models.
     Using distinct storage models from the API and domain is already common SQuaRE practice.
 
+To demonstrate how this architecture works, we'll consider Noteburst.
+Noteburst has a simple REST API.
+Clients can send a ``POST /notebooks/`` request with a Jupyter notebook they would like to run on the Rubin Science Platform.
+The result of that initial request is a dataset containing information about the job, including a URL where the client can poll for the result with ``GET`` requests.
+
+Interface model example
+-----------------------
+
+The client library for Noteburst would include these two Pydantic models.
+The ``PostNotebookRequest`` model describes the JSON-formatted data that clients send in their ``POST /notebooks/`` requests.
+The ``NotebookResponse`` model describes the format of the server's initial response, both to the original ``POST /notebooks/`` request and any subsequent ``GET`` requests to the job result URL.
+Notice how the models describe the schemas of fields and don't rely on domain information.
+
+.. literalinclude:: example-code/interface.py
+
+.. note::
+
+   The ``arq.Jobs.JobStatus`` dependency, which is an enum, is actually domain specific.
+   Best practice would be to create a generic enum in the client library that defines job states and then transform ``arq``\ 's ``JobStatus`` into that enum type.
+   Then if Noteburst no longer uses ``arq``, the status variables would not change.
+   Additionally, the client library would no longer depend on ``arq``.
+
+Server-side interface model example
+-----------------------------------
+
+In the server application, alongside the module containing the endpoint handlers, Noteburst imports and subclasses the base interface models from the client library.
+Notice how the purpose of these subclasses is to add additional constructors and helper methods.
+The ``NotebookResponse.from_job_metadata`` classmethod specifically creates a notebook response from internal domain models (namely JobMetadata).
+
+.. literalinclude:: example-code/serverinterface.py
 
 .. Make in-text citations with: :cite:`bibkey`.
 
