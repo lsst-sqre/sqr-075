@@ -20,11 +20,11 @@ Traditionally, we have focused our efforts on optimizing the development process
 
 One of our most significant advances in developing server applications in recent years has been in adopting FastAPI_, the application framework, and Pydantic_, the data modelling and validation library.
 FastAPI uses Pydantic models to describe the data schemas for both requests and responses in a REST API.
-Pydantic integrates with Python annotations so that we can be confident that we are using API interface models correctly in a code base (e.g., validate that fields exist, or that the field can be set to null/None) using a static type checker like Mypy_.
-Additionally, Pydantic performs validation of datasets to ensure that it conforms to the schema described by the type annotations and any additional validation functions.
+Pydantic integrates with Python annotations so that we can be confident that we are using API interface models correctly in a code base (e.g., validate that fields exist, or that fields can be set to null/None) using a static type checker like Mypy_.
+Additionally, Pydantic performs validation of datasets to ensure that they conform to the schema described by type annotations and any additional validation functions.
 Finally, FastAPI automatically uses these Pydantic models to generate detailed REST API documentation with the OpenAPI standard.
 
-Clients are, of course, using the same schemas for the complementary actions of sending requests and parsing responses.
+Clients, of course, use the same schemas for the complementary actions of sending requests and parsing responses.
 And although it's not strictly necessary, client development benefits greatly from also using Pydantic classes to describe the request and response schemas for the same reasons of static type analysis and automatic data parsing and validation.
 
 In principle, the client and server *can* use the very same Pydantic classes to describe the request and response bodies in a REST API.
@@ -39,7 +39,6 @@ Possible ways to share models between server and clients
 ========================================================
 
 While working on this problem of model and code duplication between servers and clients, we examined multiple approaches.
-This section outlines those, and these were discarded, before proposing the *vertical monorepo* architecture.
 
 .. _separate-client-repo:
 
@@ -51,14 +50,14 @@ Note that applications (such as SQuaRE's FastAPI web applications) are *not* lib
 Even if they were published to a repository like PyPI, applications have pinned dependencies for reasons of build reproducibility that prevent them from realistically being installed in other contexts.
 This is also why SQuaRE has two fundamentally different templates for python projects: the FastAPI application template and the Python library template.
 
-Keeping with the common SQuaRE practice of using separate Git repositories for Python library packages from applications, we found three conceivable patterns:
+Keeping with the common SQuaRE practice of using separate Git repositories for Python library packages and applications, we found three conceivable patterns:
 
 1. A client package repository for every application repository
 2. Using Safir_ as a shared library for application models
 3. A dedicated monorepo for application models
 
 The first option keeps libraries focused on a single domain, but has the downside of doubling the number of GitHub repositories that need to be maintained.
-Options 2 and 3 collect models together, which reduces the number of repositories, but introduces new issues of version management if different versions of an application's models need to be used simultaneously by a client.
+Options 2 and 3 collect models together, which reduces the number of repositories, but introduces new issues of version management if different versions of application models need to be used simultaneously by a client.
 
 In all of these cases, using a separate library for application models makes application development much more inconvenient.
 This is because server application dependencies are resolved and hashed with pip-tools_.
@@ -69,16 +68,16 @@ A vertical monorepo architecture
 --------------------------------
 
 The potential solutions listed previously introduce the issue of coordinated pull requests and releases being required to make any change to any REST API change.
-This indicates that separate client library repositories are not the right approach.
+This indicates that client library repositories are not the right approach.
 
-The orthogonal approach, then, is to consider a vertical mono repo architecture within the domain of each web API.
+The orthogonal approach, then, is to consider a vertical monorepo architecture within the domain of each web API.
 Put concretely: in the same GitHub repository where a FastAPI application is developed, a Python library containing the Pydantic models is also developed.
 Now, any change to a web API only requires a single pull request to one repository.
 When a release is made, the FastAPI application is published as a Docker image, while the library with Pydantic models is published to PyPI.
 The FastAPI application itself imports the library locally, while external clients can depend on the library from PyPI.
 
-This solution seems to solve the problem of both making Pydantic interface models efficiently reusable, while eliminating repository sprawl and making it possible to encapsulate feature update to a single pull request.
-On the other hand, this solution us to change how we structure GitHub repositories, effectively combining the existing FastAPI application template and the PyPI package template into one.
+This solution seems to solve the problem of both making Pydantic interface models efficiently reusable, while eliminating repository sprawl and making it possible to encapsulate feature updates to a single pull request.
+On the other hand, this solution forces us to change how we structure GitHub repositories, effectively combining the existing FastAPI application template and the PyPI package template into one.
 The next section explores the mechanics of a vertical monorepo.
 
 The mechanics of a vertical monorepo
@@ -127,7 +126,7 @@ How the application depends on the client library
 
 For an effective development workflow, the application needs to be able to import models from the client library locally, rather than through a PyPI release.
 In current practice, applications use the ``requirements.txt`` file format to declare their dependencies.
-We were not able to declare a local dependency in the requirements file.
+We were not able to declare a local dependency in the requirements file, though.
 
 We found the only viable mechanism is to manually pip install the client library in development and deployment contexts (the specific patterns are explored below).
 The downside of this approach is that the client isn't considered by the pinned dependencies compiled by pip-tools_.
@@ -151,7 +150,7 @@ In the Docker image, both the client and server directories are copied into the 
 Installing the client in the server's Tox environments
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Tox_ runs tests and other development tasks in virtual environments that Tox itself manages.
+Tox_ runs tests and other development tasks in Python virtual environments that Tox itself manages.
 To date, the application dependencies are installed using ``pip install -r ...``-type commands through the Tox ``deps`` environment configuration:
 
 .. code-block:: ini
@@ -171,7 +170,7 @@ As with the Dockerfile, the local pip installation of the client is accomplished
        -r{toxinidir}/requirements/dev.txt
        ../client
 
-We found this only works if the ``requirements/main.txt`` and ``dev.txt`` requirements are *unhashed*.
+We found this works only if the ``requirements/main.txt`` and ``dev.txt`` requirements are *unhashed*.
 Conventionally, we generate hashed requirements files with pip-tools_ as a security measure to ensure that the packages being installed in the deployment Docker image are *exactly* the same as those tested against.
 However, when Tox uses pip to install hashed requirements file, it triggers a mode where pip requires hashed dependencies for all entries in the Tox ``deps`` configuration.
 As the local client dependency is unhashed, the requirements files *cannot* be hashed.
@@ -218,7 +217,7 @@ Instead, the ``tox.ini`` configuration files needed to be located in the same di
 This naturally implies ``test/`` directories that are also in the ``server/`` and ``client/`` directories.
 
 Only Python unit tests are needed in the ``server/tests`` directory, though, because the client and its models can be used in the server endpoint tests.
-Add extra tests for the client library is superfluous.
+Adding extra tests for the client library is superfluous.
 
 Linting the client and server code bases
 ----------------------------------------
@@ -226,15 +225,14 @@ Linting the client and server code bases
 For Python projects, we use linters to ensure consistency and correctness:
 
 - isort, to sort imports consistently
-- block, to format Python code consistently
+- black, to format Python code consistently
 - mypy, to check type annotations
 - flake8, to statically validate Python code
 
-These linters are generally triggered by automatically with the pre-commit Git hook manager, or manually through a tox environment.
+These linters are generally triggered automatically with the pre-commit Git hook manager, or manually through a tox environment.
 
 In the monorepo, pre-commit itself needs to be configured at the root since it doesn't have specific support for monorepos (see `pre-commit/pre-commit#466 <https://github.com/pre-commit/pre-commit/issues/466>`__).
 Thus the monorepo has a ``.pre-commit-config.yaml`` file at its root.
-If the pre-commit hooks need to be configured different for each repo, though
 It's possible to configure the pre-commit hooks differently for the client and server using file path filters in the pre-commit configuration (as described in the mentioned GitHub issue), but in practice this shouldn't be necessary.
 
 Since flake8 is configured with a ``.flake8`` file, that file can be located at the root of the repository.
@@ -253,7 +251,7 @@ Documentation
 -------------
 
 In most cases, a single documentation project for both the client and server is appropriate.
-Since both the client and server APIs are available in the documentation build time, code from both the server and client can be documented in the same Sphinx project by referencing the correct modules with the ``automodapi`` directive.
+Since both code bases are available during the documentation build, APIs from both the server and client can be documented in the same Sphinx project by referencing the correct modules with the ``automodapi`` directive.
 Because of how the ``tox.ini`` files need to be co-located alongside ``pyproject.toml`` files, the best place is likely in ``server/docs`` and built through a tox environment in the server.
 
 GitHub Actions
@@ -276,12 +274,12 @@ Client package naming
 
 We may want to systematically prefix the package names for discovery and sorting on PyPI and Conda-Forge.
 For example, rather than ``noteburst-client``, we may prefer to use ``rsp-notebust-client`` or even ``rubin-rsp-noteburst-client``.
-This will reduce the risk of collisions with other packages on open source package registries.
+This reduces the risk of collisions with other packages on open source package registries.
 
 Python namespace
 ----------------
 
-We may want place client libraries in a common namespace using a Python packaging feature called `namespace packages`_.
+We may want to place client libraries into a common namespace using a Python packaging feature called `namespace packages`_.
 For example, clients for RSP services may want to use the ``lsst.rsp`` namespace: ``lsst.rsp.noteburst``.
 
 Namespace packages can be set up by adding intermediate directories inside the ``src`` directory:
@@ -297,7 +295,7 @@ Namespace packages can be set up by adding intermediate directories inside the `
    │   └── src
    │       └── lsst
    │           └── rsp
-   │               └── example
+   │               └── noteburst
    │                   ├── __init__.py
    │                   └── models.py
    ├── Dockerfile
@@ -305,9 +303,9 @@ Namespace packages can be set up by adding intermediate directories inside the `
    └── server
        ├── pyproject.toml
        └── src
-           └── example
+           └── noteburst
 
-With a setuptools build backend, the namespace package for the client can be discovered with this configuration in ``pyproject.toml``:
+A setuptools build backend can discover the client's namespace package with this configuration in ``pyproject.toml``:
 
 .. code-block:: toml
 
@@ -322,9 +320,9 @@ With a setuptools build backend, the namespace package for the client can be dis
 Architectural patterns for Pydantic models
 ==========================================
 
-In many of our applications, our existing practice has been to reuse the same Pydantic models for both the REST API and the application's internal domain layer.
+In many applications, our existing practice has been to reuse the same Pydantic models for both the REST API and the application's internal domain layer.
 This is a convenient, but has the downside of exposing the application's internal domain through the REST API.
-If the models are now shared with clients, the interface models truly must be separate because clients are unlikely to have access to the dependencies of the server's domain models.
+If the models are now shared with clients, the interface models must be truly separate because clients are unlikely to have access to the dependencies needed by the server's domain models.
 
 The client-server monorepo architecture suggests a four-layer model architecture:
 
@@ -339,34 +337,34 @@ Storage models
     Our SQL database models are typically SQLAlchemy classes, while the Redis and external API models are typically Pydantic models.
     Using distinct storage models from the API and domain is already common SQuaRE practice.
 
-To demonstrate how this architecture works, we'll consider Noteburst.
-Noteburst has a simple REST API.
-Clients can send a ``POST /notebooks/`` request with a Jupyter notebook they would like to run on the Rubin Science Platform.
-The result of that initial request is a dataset containing information about the job, including a URL where the client can poll for the result with ``GET`` requests.
+To demonstrate how this architecture works, we'll consider Noteburst, which has a very simple REST API.
+Clients send a ``POST /notebooks/`` request with a Jupyter notebook they would like to run on the Rubin Science Platform.
+The result of that initial request is a response containing information about the job, including a URL where the client can poll for the result with ``GET`` requests.
 
 Interface model example
 -----------------------
 
-The client library for Noteburst would include these two Pydantic models.
+The client library for Noteburst would include two Pydantic models for the request and response schemas.
 The ``PostNotebookRequest`` model describes the JSON-formatted data that clients send in their ``POST /notebooks/`` requests.
-The ``NotebookResponse`` model describes the format of the server's initial response, both to the original ``POST /notebooks/`` request and any subsequent ``GET`` requests to the job result URL.
-Notice how the models describe the schemas of fields and don't rely on domain information.
+The ``NotebookResponse`` model describes the format of the server's response, both to the original ``POST /notebooks/`` request and any subsequent ``GET`` requests to the job result URL.
+Notice how the models describe the schemas of fields and don't rely on internal domain details of the application.
 
 .. literalinclude:: example-code/interface.py
 
 .. note::
 
-   The ``arq.Jobs.JobStatus`` dependency, which is an enum, is actually domain specific.
-   Best practice would be to create a generic enum in the client library that defines job states and then transform ``arq``\ 's ``JobStatus`` into that enum type.
-   Then if Noteburst no longer uses ``arq``, the status variables would not change.
+   The ``arq.Jobs.JobStatus`` dependency, which is an enum, is technically domain-specific.
+   Best practice would be to create a generic enum in the client library that defines job states.
+   Then the noteburst server interface would transform ``arq``\ 's ``JobStatus`` into the Noteburst API enum.
+   That way, if Noteburst no longer uses ``arq``, the status variables would not change.
    Additionally, the client library would no longer depend on ``arq``.
 
 Server-side interface model example
 -----------------------------------
 
-In the server application, alongside the module containing the endpoint handlers, Noteburst imports and subclasses the base interface models from the client library.
+In the server application, alongside the Python module containing the endpoint handlers, Noteburst imports and subclasses the base interface models from the client library.
 Notice how the purpose of these subclasses is to add additional constructors and helper methods.
-The ``NotebookResponse.from_job_metadata`` classmethod specifically creates a notebook response from internal domain models (namely JobMetadata).
+The ``NotebookResponse.from_job_metadata`` classmethod specifically creates a notebook response from internal domain models (namely ``JobMetadata``).
 
 .. literalinclude:: example-code/serverinterface.py
 
@@ -374,10 +372,10 @@ A new library for SQuaRE Pydantic model utilities
 =================================================
 
 Safir includes several utilities for building Pydantic models, including validation methods and datetime formatters.
-Given that the interface models in the client libraries should not depend on Safir (and therefore the full FastAPI and Starlette server framework), these helpers should be moved into a separate library package.
+Given that the interface models in the client libraries should not depend on Safir (and hence the full FastAPI and Starlette server framework), these helpers should be moved into a separate library package.
 
-A sans-IO architecture for client classes
-=========================================
+A sans-I/O architecture for client classes
+==========================================
 
 Besides the Pydantic models, the client libraries can also include classes that make it easy to send requests to the application.
 Those client classes would help with building URLs, assembling authentication headers, constructing the request models, and more.
@@ -385,7 +383,7 @@ Although not strictly necessary, a useful pattern we should consider when buildi
 This pattern is used by Gidgethub_, the GitHub API client, and also by Kafkit_, SQuaRE's client for the Confluent Schema Registry.
 With the sans-I/O pattern, it's possible to create a client that can work with multiple HTTP libraries, such as HTTPX, aiohttp, and Requests.
 
-To implement a sans-I/O client, create a *abstract* class that implements the HTTP methods (``GET``, ``POST``, ``PATCH``, ``PUT``, ``DELETE``) including formatting headers, as well as providing any higher-level methods that work with specific endpoints.
+To implement a sans-I/O client, create a *abstract* class that implements the HTTP methods (``GET``, ``POST``, ``PATCH``, ``PUT``, ``DELETE``) which format headers and request bodies, as well as providing any higher-level methods that work with specific endpoints.
 All actual HTTP calls are made through an abstract ``_request`` method that takes the HTTP method, URL, headers, and body (as bytes), as its arguments.
 Then for each HTTP client library, create a subclass of that sans-I/O abstract class that implements the ``_request`` method for that HTTP client.
 
