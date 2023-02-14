@@ -376,6 +376,23 @@ A new library for SQuaRE Pydantic model utilities
 Safir includes several utilities for building Pydantic models, including validation methods and datetime formatters.
 Given that the interface models in the client libraries should not depend on Safir (and therefore the full FastAPI and Starlette server framework), these helpers should be moved into a separate library package.
 
+A sans-IO architecture for client classes
+=========================================
+
+Besides the Pydantic models, the client libraries can also include classes that make it easy to send requests to the application.
+Those client classes would help with building URLs, assembling authentication headers, constructing the request models, and more.
+Although not strictly necessary, a useful pattern we should consider when building these client classes is the `Sans-I/O pattern <https://sans-io.readthedocs.io>`__.
+This pattern is used by Gidgethub_, the GitHub API client, and also by Kafkit_, SQuaRE's client for the Confluent Schema Registry.
+With the sans-I/O pattern, it's possible to create a client that can work with multiple HTTP libraries, such as HTTPX, aiohttp, and Requests.
+
+To implement a sans-I/O client, create a *abstract* class that implements the HTTP methods (``GET``, ``POST``, ``PATCH``, ``PUT``, ``DELETE``) including formatting headers, as well as providing any higher-level methods that work with specific endpoints.
+All actual HTTP calls are made through an abstract ``_request`` method that takes the HTTP method, URL, headers, and body (as bytes), as its arguments.
+Then for each HTTP client library, create a subclass of that sans-I/O abstract class that implements the ``_request`` method for that HTTP client.
+
+This approach future-proofs the client library for new HTTP libraries, and makes the client more widely useful.
+As well, a mock version of the client can be implemented that doesn't do any network requests, but does capture information for introspection.
+Such a mock can be useful for testing.
+
 .. Make in-text citations with: :cite:`bibkey`.
 
 .. References
@@ -385,7 +402,9 @@ Given that the interface models in the client libraries should not depend on Saf
 ..    :style: lsst_aa
 
 .. _fastapi: https://fastapi.tiangolo.com
+.. _gidgethub: https://gidgethub.readthedocs.io/
 .. _`JupyterLab Controller`: https://github.com/lsst-sqre/jupyterlab-controller
+.. _kafkit: https://kafkit.lsst.io
 .. _mobu: https://github.com/lsst-sqre/mobu
 .. _mypy: https://mypy.readthedocs.io/en/stable/
 .. _namespace packages: https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
