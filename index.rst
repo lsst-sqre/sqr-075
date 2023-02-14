@@ -370,6 +370,12 @@ The ``NotebookResponse.from_job_metadata`` classmethod specifically creates a no
 
 .. literalinclude:: example-code/serverinterface.py
 
+A new library for SQuaRE Pydantic model utilities
+=================================================
+
+Safir includes several utilities for building Pydantic models, including validation methods and datetime formatters.
+Given that the interface models in the client libraries should not depend on Safir (and therefore the full FastAPI and Starlette server framework), these helpers should be moved into a separate library package.
+
 .. Make in-text citations with: :cite:`bibkey`.
 
 .. References
