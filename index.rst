@@ -135,7 +135,11 @@ This practice ensures that Docker builds and development environments alike are 
 In practice, the client library's absence from ``requirements/main.txt`` itself isn't harmful because the client is inherently pinned by virtue of being co-developed in the same Git repository.
 
 What's potentially concerning, though, is the absence of the client's own dependencies from the application's ``requirements/main.txt`` dependencies.
-We could mitigate this risk by limiting client library dependencies to packages that are already in the main application's ``requirements/main.txt``.
+Though the server will still install all the client's dependencies via the pip-installation of the client into the Docker image, the client's dependencies *won't* be pinned — hence the build will not be reproducible.
+This risk can be mitigated by ensuring that the client library's dependencies are also in the main application's ``requirements/main.txt``, which would be a manual process.
+The impact of this will be limited since the aspects of the client that the server application will likely import will depend largely on Pydantic itself and perhaps the SQuaRE library with Pydantic extensions.
+However, dependencies like libraries that provide custom Pydantic field types or validations will need to be deliberately added and managed to the application's own requirements to ensure proper version pinning.
+This is a non-obvious workaround, and a downside of the vertical monorepo architecture.
 
 Installing the client in the Docker image
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
