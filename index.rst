@@ -121,6 +121,8 @@ This necessitates that a vertical monorepo must have two directories at its root
 This monorepo contains two Python packages: ``example`` (the application) and ``exampleclient`` (the library).
 The ``exampleclient.models`` module contains the Pydantic classes that define the REST API for the ``example`` application.
 
+.. _client-dependency:
+
 How the application depends on the client library
 -------------------------------------------------
 
@@ -321,6 +323,8 @@ A setuptools build backend can discover the client's namespace package with this
    Client libraries for Roundtable applications may or may not use a similar namespace prefix, depending on our marketing strategy.
    For example, LSST the Docs (or its successor) might not use "roundtable" in its branding if we want advertise it as being deployable separately from Phalanx/Roundtable.
 
+.. _pydantic-models:
+
 Architectural patterns for Pydantic models
 ==========================================
 
@@ -378,6 +382,8 @@ A new library for SQuaRE Pydantic model utilities
 Safir includes several utilities for building Pydantic models, including validation methods and datetime formatters.
 Given that the interface models in the client libraries should not depend on Safir (and hence the full FastAPI and Starlette server framework), these helpers should be moved into a separate library package.
 
+.. _sansio-client:
+
 A sans-I/O architecture for client classes
 ==========================================
 
@@ -394,6 +400,33 @@ Then for each HTTP client library, create a subclass of that sans-I/O abstract c
 This approach future-proofs the client library for new HTTP libraries, and makes the client more widely useful.
 As well, a mock version of the client can be implemented that doesn't do any network requests, but does capture information for introspection.
 Such a mock can be useful for testing.
+
+Review and recommendations
+==========================
+
+The vertical monorepo architecture is a means for efficiently developing and publishing code that is used both in the server and client applications.
+With the vertical monorepo, the client and server share exactly the same Pydantic model that defines the structure of REST endpoint request and response bodies (:ref:`pydantic-models`).
+The server also benefits from the client class, which can help drive the server's tests.
+Other clients can also benefit from a centrally-maintained mock client of a service (:ref:`sansio-client`).
+
+This technote has demonstrated that a vertical monorepo is possible to implement, but there are drawbacks:
+
+- Client dependencies are not version-pinned in the server application by default (a manual maintenance process is necessary, see :ref:`client-dependency`).
+- The architecture is unfamiliar to the common Python developer, so extra documentation is needed for both our team and for open source collaborators.
+- Most Python tooling is not designed around monorepos, so the usage here is against the grain.
+
+Ultimately there is a both a cost and a benefit to adopting the vertical client-server monorepo architecture in our applications.
+For any given application, the balance of this analysis may weigh towards or away from implementing this pattern.
+If an application has no API clients (or we are not developing Python clients), the client-server monorepo provides no benefit.
+On the opposite end of the spectrum, if the application has a complex API, an API that is rapidly developed in ways that clients must quickly upgrade to, and we as a team are interacting with that application from multiple clients, then the client-server monorepo is clearly beneficial.
+For applications that are somewhere in between it becomes a judgement call for whether the API is complex *enough*, changes *enough*, or has *enough* clients to justify the downsides of the client-server monorepo architecture.
+
+.. mermaid:: decision-chart.mmd
+
+Overall, we believe that SQuaRE does have applications where the client-server vertical monorepo provides clear benefits.
+For example, the JupyterLab Controller (:sqr:`066`) has a substantial API with multiple Python clients (Mobu and Noteburst, among potential others).
+Outside the scope of REST API servers and clients, the vertical monorepo could also benefit SQuaRE's Kafka producers and clients.
+If the Avro-encoded messages have schemas originally defined as Pydantic models, then the producer could publish a client library containing those models which Kafka consumers could use.
 
 .. Make in-text citations with: :cite:`bibkey`.
 
