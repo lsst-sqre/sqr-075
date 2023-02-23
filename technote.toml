@@ -1,0 +1,14 @@
+[technote]
+id = "SQR-075"
+series_id = "SQR"
+canonical_url = "https://sqr-075.lsst.io"
+github_url = "https://github.com/lsst-sqre/sqr-075"
+github_default_branch = "main"
+# version = "1.0.0"
+
+[[technote.authors]]
+name = { given_names = "Jonathan", family_names = "Sick" }
+orcid = "https://orcid.org/0000-0003-3001-676X"
+affiliations = [
+    { name = "Rubin Observatory", ror = "https://ror.org/048g3cy84" },
+]

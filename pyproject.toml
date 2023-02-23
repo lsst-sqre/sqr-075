@@ -1,0 +1,22 @@
+[tool.black]
+line-length = 79
+target-version = ["py38"]
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 79
+# This tox config might be used for the server isort with pre-commit; so add safir demo as a firstparty
+known_first_party = ["noteburst"]
+skip = ["docs/conf.py"]
