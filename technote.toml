@@ -5,6 +5,8 @@ canonical_url = "https://sqr-075.lsst.io"
 github_url = "https://github.com/lsst-sqre/sqr-075"
 github_default_branch = "main"
 # version = "1.0.0"
+date_created = "2023-02-08"
+date_updated = "2023-02-23"
 
 [[technote.authors]]
 name = { given_names = "Jonathan", family_names = "Sick" }
