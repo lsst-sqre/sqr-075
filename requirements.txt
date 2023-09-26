@@ -1,4 +1,4 @@
 tox
 pre-commit
-documenteer[technote]==1.0.0a8
+documenteer[technote]==1.0.0a9
 sphinxcontrib-mermaid
