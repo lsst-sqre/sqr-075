@@ -1,7 +1,7 @@
 .PHONY:
 init:
-	python -m venv .venv
-	pip install tox
+	pip install tox pre-commit
+	pre-commit install
 
 .PHONY:
 html:
