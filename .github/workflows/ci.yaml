@@ -4,9 +4,9 @@ name: CI
 
 jobs:
   call-workflow:
-    uses: lsst-sqre/rubin-sphinx-technote-workflows/.github/workflows/ci.yaml@v1
+    uses: lsst-sqre/rubin-sphinx-technote-workflows/.github/workflows/ci.yaml@tickets/DM-41337
     with:
-      handle: sqr-075
+      handle: SQR-075
     secrets:
       ltd_username: ${{ secrets.LTD_USERNAME }}
       ltd_password: ${{ secrets.LTD_PASSWORD }}
