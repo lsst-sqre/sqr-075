@@ -15,7 +15,7 @@ affiliations = [
     { name = "Rubin Observatory", ror = "https://ror.org/048g3cy84" },
 ]
 
-[sphinx]
+[technote.sphinx]
 extensions = [
     "sphinxcontrib.mermaid"
 ]

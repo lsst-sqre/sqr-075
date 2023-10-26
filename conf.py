@@ -11,4 +11,4 @@ from documenteer.conf.technote import *  # noqa: F401, F403
 # https://github.com/mgaitan/sphinxcontrib-mermaid/issues/110
 mermaid_version = "9.4.0"
 
-exclude.append(".tox")
+exclude_patterns.append(".tox")
