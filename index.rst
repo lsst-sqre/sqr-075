@@ -194,7 +194,7 @@ This is a project Makefile that prepares both types of requirements files with p
    	pip-compile --upgrade --build-isolation --generate-hashes --output-file server/requirements/dev.hashed.txt server/requirements/dev.in
    	pip-compile --upgrade --build-isolation --allow-unsafe --output-file server/requirements/main.txt server/requirements/main.in
    	pip-compile --upgrade --build-isolation --allow-unsafe --output-file server/requirements/dev.txt server/requirements/dev.in
-   
+
    .PHONY: init
    init:
    	pip install --editable "./client[dev]"
@@ -203,10 +203,10 @@ This is a project Makefile that prepares both types of requirements files with p
    	rm -rf ./server.tox
    	pip install --upgrade pre-commit tox
    	pre-commit install
-   
+
    .PHONY: update
    update: update-deps init
-   
+
    .PHONY: run
    run:
    	cd server && tox run -e=run
