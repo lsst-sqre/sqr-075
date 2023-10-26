@@ -1,2 +1,2 @@
-documenteer[technote]==1.0.0a10
+documenteer[technote]>=1.0.0a11
 sphinxcontrib-mermaid
