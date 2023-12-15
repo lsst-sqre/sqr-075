@@ -8,11 +8,19 @@ html:
 	tox run -e html
 
 .PHONY:
-clean:
-	rm -rf _build
+lint:
+	tox run -e lint,linkcheck
 
 .PHONY:
-refresh-bib:
-	tox run -e refresh-bib
-	@echo
-	@echo "Commit the new bibliographies: git add lsstbib && git commit -m \"Update bibliographies.\""
+add-author:
+	tox run -e add-author
+
+.PHONY:
+sync-authors:
+	tox run -e sync-authors
+
+.PHONY:
+clean:
+	rm -rf _build
+	rm -rf .technote
+	rm -rf .tox
